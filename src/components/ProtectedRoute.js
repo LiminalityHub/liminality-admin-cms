@@ -12,6 +12,11 @@ import { useAuth } from '../context/AuthContext';
  * - Logged in and approved → render children
  */
 export default function ProtectedRoute({ children }) {
+  // DEV BYPASS: skip auth to work on the editor UI
+  if (process.env.REACT_APP_DEV_BYPASS_AUTH === 'true') {
+    return children;
+  }
+
   const { currentUser, isApproved, loading } = useAuth();
 
   if (loading) {

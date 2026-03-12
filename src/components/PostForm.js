@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import NotionEditor from './NotionEditor';
 
 function PostForm({ initialData, submitLabel, onSubmit, isSaving }) {
   const [form, setForm] = useState({
@@ -54,10 +55,10 @@ function PostForm({ initialData, submitLabel, onSubmit, isSaving }) {
         <textarea rows={3} value={form.excerpt} onChange={(e) => updateField('excerpt', e.target.value)} />
       </label>
 
-      <label className="field">
-        <span>Content (HTML)</span>
-        <textarea rows={14} value={form.content} onChange={(e) => updateField('content', e.target.value)} />
-      </label>
+      <div className="field">
+        <span>Content</span>
+        <NotionEditor value={form.content} onChange={(html) => updateField('content', html)} />
+      </div>
 
       <div className="grid-3">
         <label className="field">
