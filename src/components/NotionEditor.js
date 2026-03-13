@@ -65,6 +65,30 @@ function pickImageFile() {
   });
 }
 
+
+/* ── Block type items (for "Turn into" menu) ─────────────────────── */
+const BLOCK_TYPES = [
+  { label: 'Text',           icon: 'Aa',  action: (e) => e.chain().focus().setParagraph().run() },
+  { label: 'Heading 1',      icon: 'H1',  action: (e) => e.chain().focus().toggleHeading({ level: 1 }).run() },
+  { label: 'Heading 2',      icon: 'H2',  action: (e) => e.chain().focus().toggleHeading({ level: 2 }).run() },
+  { label: 'Heading 3',      icon: 'H3',  action: (e) => e.chain().focus().toggleHeading({ level: 3 }).run() },
+  { label: 'Bullet List',    icon: '•',   action: (e) => e.chain().focus().toggleBulletList().run() },
+  { label: 'Numbered List',  icon: '1.',  action: (e) => e.chain().focus().toggleOrderedList().run() },
+  { label: 'Quote',          icon: '"',   action: (e) => e.chain().focus().toggleBlockquote().run() },
+  { label: 'Code Block',     icon: '</>',  action: (e) => e.chain().focus().toggleCodeBlock().run() },
+];
+
+function getActiveBlockType(editor) {
+  if (editor.isActive('heading', { level: 1 })) return 'Heading 1';
+  if (editor.isActive('heading', { level: 2 })) return 'Heading 2';
+  if (editor.isActive('heading', { level: 3 })) return 'Heading 3';
+  if (editor.isActive('bulletList')) return 'Bullet List';
+  if (editor.isActive('orderedList')) return 'Numbered List';
+  if (editor.isActive('blockquote')) return 'Quote';
+  if (editor.isActive('codeBlock')) return 'Code Block';
+  return 'Text';
+}
+
 /* ── Slash-command menu items ─────────────────────────────────────── */
 const SLASH_ITEMS = [
   { label: 'Text',           icon: 'Aa',  action: (e) => e.chain().focus().setParagraph().run() },
@@ -128,6 +152,12 @@ export default function NotionEditor({ value, onChange }) {
   // Floating toolbar state
   const [toolbarVisible, setToolbarVisible] = useState(false);
   const [toolbarPos, setToolbarPos] = useState({ top: 0, left: 0 });
+
+  // Block handle state
+  const [handlePos, setHandlePos] = useState({ top: 0 });
+  const [handleVisible, setHandleVisible] = useState(false);
+  const [blockMenuOpen, setBlockMenuOpen] = useState(false);
+  const blockMenuRef = useRef(null);
 
   const editor = useEditor({
     extensions: [
@@ -252,6 +282,44 @@ export default function NotionEditor({ value, onChange }) {
     return () => editor.off('transaction', handleTransaction);
   }, [editor, slashOpen, closeSlash]);
 
+  // Track current block for the handle button
+  useEffect(() => {
+    if (!editor) return;
+
+    const updateHandle = () => {
+      const { from } = editor.state.selection;
+      const resolvedPos = editor.state.doc.resolve(from);
+      const blockStart = resolvedPos.start(1);
+      try {
+        const coords = editor.view.coordsAtPos(blockStart);
+        const editorRect = editor.view.dom.closest('.notion-editor-wrap').getBoundingClientRect();
+        setHandlePos({ top: coords.top - editorRect.top });
+        setHandleVisible(true);
+      } catch {
+        setHandleVisible(false);
+      }
+    };
+
+    editor.on('selectionUpdate', updateHandle);
+    editor.on('focus', updateHandle);
+    return () => {
+      editor.off('selectionUpdate', updateHandle);
+      editor.off('focus', updateHandle);
+    };
+  }, [editor]);
+
+  // Close block menu on outside click
+  useEffect(() => {
+    if (!blockMenuOpen) return;
+    const handleClick = (e) => {
+      if (blockMenuRef.current && !blockMenuRef.current.contains(e.target)) {
+        setBlockMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [blockMenuOpen]);
+
   // Watch for text selection to show/hide floating toolbar
   useEffect(() => {
     if (!editor) return;
@@ -306,6 +374,39 @@ export default function NotionEditor({ value, onChange }) {
             onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleCode().run(); }}
             className={editor.isActive('code') ? 'is-active' : ''}
           >&lt;/&gt;</button>
+        </div>
+      )}
+
+      {/* Block handle + Turn into menu */}
+      {handleVisible && (
+        <div className="notion-block-handle" style={{ top: handlePos.top }}>
+          <button
+            type="button"
+            className="notion-block-handle-btn"
+            onClick={() => setBlockMenuOpen((v) => !v)}
+            title="Turn into…"
+          >
+            ⋮⋮
+          </button>
+          {blockMenuOpen && (
+            <div className="notion-block-menu" ref={blockMenuRef}>
+              <div className="notion-block-menu-label">Turn into</div>
+              {BLOCK_TYPES.map((item) => (
+                <button
+                  type="button"
+                  key={item.label}
+                  className={`notion-slash-item ${getActiveBlockType(editor) === item.label ? 'active' : ''}`}
+                  onClick={() => {
+                    item.action(editor);
+                    setBlockMenuOpen(false);
+                  }}
+                >
+                  <span className="notion-slash-icon">{item.icon}</span>
+                  <span>{item.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
