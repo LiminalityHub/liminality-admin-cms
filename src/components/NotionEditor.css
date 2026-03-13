@@ -232,11 +232,15 @@
   background: none;
   color: #bbb;
   font-size: 14px;
-  cursor: pointer;
+  cursor: grab;
   border-radius: 4px;
   letter-spacing: -2px;
   padding: 0;
   transition: color 0.15s, background 0.15s;
+}
+
+.notion-block-handle-btn:active {
+  cursor: grabbing;
 }
 
 .notion-block-handle-btn:hover {
@@ -264,4 +268,16 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 6px 10px 4px;
+}
+
+/* ── Drop indicator line ─────────────────────────────────────────── */
+.notion-drop-line {
+  position: absolute;
+  left: 36px;
+  right: 16px;
+  height: 2px;
+  background: #2563eb;
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 50;
 }

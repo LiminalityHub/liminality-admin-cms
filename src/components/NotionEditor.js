@@ -159,6 +159,10 @@ export default function NotionEditor({ value, onChange }) {
   const [blockMenuOpen, setBlockMenuOpen] = useState(false);
   const blockMenuRef = useRef(null);
 
+  // Drag-to-reorder state
+  const dragInfo = useRef({ active: false, sourceIndex: -1, targetIndex: -1 });
+  const [dropLine, setDropLine] = useState(null);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -320,6 +324,97 @@ export default function NotionEditor({ value, onChange }) {
     return () => document.removeEventListener('mousedown', handleClick);
   }, [blockMenuOpen]);
 
+  // Drag-to-reorder: mousedown on handle starts tracking
+  const handleHandleMouseDown = useCallback((e) => {
+    if (!editor) return;
+    e.preventDefault();
+    const startY = e.clientY;
+    let dragged = false;
+
+    // Find which top-level block the cursor is in
+    const { from } = editor.state.selection;
+    const doc = editor.state.doc;
+    let pos = 0;
+    let sourceIndex = -1;
+    for (let i = 0; i < doc.childCount; i++) {
+      if (from >= pos && from < pos + doc.child(i).nodeSize) { sourceIndex = i; break; }
+      pos += doc.child(i).nodeSize;
+    }
+    if (sourceIndex === -1) return;
+
+    const onMouseMove = (moveEvent) => {
+      if (!dragged && Math.abs(moveEvent.clientY - startY) > 5) {
+        dragged = true;
+        setBlockMenuOpen(false);
+        dragInfo.current = { active: true, sourceIndex, targetIndex: sourceIndex };
+        document.body.style.cursor = 'grabbing';
+      }
+      if (!dragged) return;
+
+      const mouseY = moveEvent.clientY;
+      const wrapEl = editor.view.dom.closest('.notion-editor-wrap');
+      const wrapRect = wrapEl.getBoundingClientRect();
+      const currentDoc = editor.state.doc;
+
+      let p = 0;
+      let bestDist = Infinity;
+      let bestIdx = 0;
+      let bestTop = 0;
+
+      for (let i = 0; i < currentDoc.childCount; i++) {
+        const dom = editor.view.nodeDOM(p);
+        if (dom && dom.getBoundingClientRect) {
+          const rect = dom.getBoundingClientRect();
+          const topDist = Math.abs(rect.top - mouseY);
+          if (topDist < bestDist) { bestDist = topDist; bestIdx = i; bestTop = rect.top - wrapRect.top; }
+          const botDist = Math.abs(rect.bottom - mouseY);
+          if (botDist < bestDist) { bestDist = botDist; bestIdx = i + 1; bestTop = rect.bottom - wrapRect.top; }
+        }
+        p += currentDoc.child(i).nodeSize;
+      }
+
+      dragInfo.current.targetIndex = bestIdx;
+      setDropLine({ top: bestTop });
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+
+      if (!dragged) {
+        // It was a click, not a drag — toggle the menu
+        setBlockMenuOpen((v) => !v);
+        return;
+      }
+
+      setDropLine(null);
+      const { sourceIndex: src, targetIndex: tgt } = dragInfo.current;
+      dragInfo.current.active = false;
+
+      if (tgt === src || tgt === src + 1) return; // no move needed
+
+      // Move the block
+      const doc = editor.state.doc;
+      const tr = editor.state.tr;
+      let srcPos = 0;
+      for (let i = 0; i < src; i++) srcPos += doc.child(i).nodeSize;
+      const srcNode = doc.child(src);
+
+      tr.delete(srcPos, srcPos + srcNode.nodeSize);
+
+      const adjustedIdx = tgt > src ? tgt - 1 : tgt;
+      let tgtPos = 0;
+      for (let i = 0; i < adjustedIdx; i++) tgtPos += tr.doc.child(i).nodeSize;
+
+      tr.insert(tgtPos, srcNode);
+      editor.view.dispatch(tr);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [editor]);
+
   // Watch for text selection to show/hide floating toolbar
   useEffect(() => {
     if (!editor) return;
@@ -383,8 +478,8 @@ export default function NotionEditor({ value, onChange }) {
           <button
             type="button"
             className="notion-block-handle-btn"
-            onClick={() => setBlockMenuOpen((v) => !v)}
-            title="Turn into…"
+            onMouseDown={handleHandleMouseDown}
+            title="Click to turn into… / Drag to reorder"
           >
             ⋮⋮
           </button>
@@ -409,6 +504,9 @@ export default function NotionEditor({ value, onChange }) {
           )}
         </div>
       )}
+
+      {/* Drop indicator line */}
+      {dropLine && <div className="notion-drop-line" style={{ top: dropLine.top }} />}
 
       {/* Editor content */}
       <EditorContent editor={editor} className="notion-editor" />
