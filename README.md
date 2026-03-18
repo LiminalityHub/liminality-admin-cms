@@ -1,5 +1,7 @@
 # Liminality Admin
 
+**Live site:** https://liminalityhub.github.io/liminality-admin-cms/
+
 Standalone admin frontend for managing blog content via REST API.
 
 ## Environment
