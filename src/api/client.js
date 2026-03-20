@@ -1,76 +1,98 @@
-import { auth } from '../firebase';
+import { db, auth } from '../firebase';
+import { 
+  collection, 
+  getDocs, 
+  getDoc, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  query, 
+  orderBy,
+  where
+} from 'firebase/firestore';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:4000';
-
-const jsonHeaders = {
-  'Content-Type': 'application/json',
-};
-
-function parseBody(response) {
-  const contentType = response.headers.get('content-type') || '';
-  if (contentType.includes('application/json')) {
-    return response.json();
-  }
-  return response.text();
-}
-
-export async function apiRequest(path, options = {}) {
-  // Attach Firebase ID token if a user is signed in
-  const authHeaders = {};
-  const user = auth.currentUser;
-  if (user) {
-    const token = await user.getIdToken();
-    authHeaders['Authorization'] = `Bearer ${token}`;
-  }
-
-  const headers = {
-    ...jsonHeaders,
-    ...authHeaders,
-    ...(options.headers || {}),
-  };
-
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers,
-  });
-
-  const body = await parseBody(response);
-
-  if (!response.ok) {
-    const error = new Error(body?.message || 'Request failed');
-    error.status = response.status;
-    error.payload = body;
-    throw error;
-  }
-
-  return body;
-}
-
+const POSTS_COLLECTION = 'posts';
 
 export async function fetchPosts() {
-  return apiRequest('/posts');
+  const postsRef = collection(db, POSTS_COLLECTION);
+  // Sort by date descending
+  const q = query(postsRef, orderBy('date', 'desc'));
+  const snapshot = await getDocs(q);
+  
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  }));
 }
 
 export async function fetchPostById(id) {
-  return apiRequest(`/posts/${id}`);
+  const postRef = doc(db, POSTS_COLLECTION, id);
+  const snapshot = await getDoc(postRef);
+  
+  if (!snapshot.exists()) {
+    const error = new Error('Post not found');
+    error.status = 404;
+    throw error;
+  }
+  
+  return {
+    id: snapshot.id,
+    ...snapshot.data()
+  };
 }
 
 export async function createPost(payload) {
-  return apiRequest('/posts', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('You must be logged in to create a post');
+  }
+
+  const now = new Date().toISOString();
+  const newPost = {
+    ...payload,
+    status: payload.status || 'published',
+    createdAt: now,
+    updatedAt: now,
+    authorId: user.uid
+  };
+
+  const docRef = await addDoc(collection(db, POSTS_COLLECTION), newPost);
+  return {
+    id: docRef.id,
+    ...newPost
+  };
 }
 
 export async function updatePost(id, payload) {
-  return apiRequest(`/posts/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(payload),
-  });
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('You must be logged in to update a post');
+  }
+
+  const postRef = doc(db, POSTS_COLLECTION, id);
+  const updatedData = {
+    ...payload,
+    updatedAt: new Date().toISOString()
+  };
+
+  await updateDoc(postRef, updatedData);
+  
+  // Return the merged data
+  const snapshot = await getDoc(postRef);
+  return {
+    id: snapshot.id,
+    ...snapshot.data()
+  };
 }
 
 export async function deletePost(id) {
-  return apiRequest(`/posts/${id}`, {
-    method: 'DELETE',
-  });
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('You must be logged in to delete a post');
+  }
+
+  const postRef = doc(db, POSTS_COLLECTION, id);
+  await deleteDoc(postRef);
+  return true;
 }
