@@ -4,6 +4,8 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut,
+  signInWithPopup,
+  GoogleAuthProvider,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
@@ -27,6 +29,23 @@ export function AuthProvider({ children }) {
       isApproved: false,
       createdAt: serverTimestamp(),
     });
+    return credential;
+  }
+
+  // Google Login: create Firestore profile if first time
+  async function googleLogin() {
+    const provider = new GoogleAuthProvider();
+    const credential = await signInWithPopup(auth, provider);
+    const userDocRef = doc(db, 'users', credential.user.uid);
+    const userDoc = await getDoc(userDocRef);
+
+    if (!userDoc.exists()) {
+      await setDoc(userDocRef, {
+        email: credential.user.email,
+        isApproved: false,
+        createdAt: serverTimestamp(),
+      });
+    }
     return credential;
   }
 
@@ -62,7 +81,7 @@ export function AuthProvider({ children }) {
     return unsubscribe;
   }, []);
 
-  const value = { currentUser, isApproved, loading, signup, login, logout };
+  const value = { currentUser, isApproved, loading, signup, googleLogin, login, logout };
 
   return (
     <AuthContext.Provider value={value}>
