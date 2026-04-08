@@ -1,13 +1,13 @@
 {
   "files": {
     "main.css": "/liminality-admin-cms/static/css/main.9a0ecad0.css",
-    "main.js": "/liminality-admin-cms/static/js/main.04b7e5f9.js",
+    "main.js": "/liminality-admin-cms/static/js/main.baf4ed8a.js",
     "index.html": "/liminality-admin-cms/index.html",
     "main.9a0ecad0.css.map": "/liminality-admin-cms/static/css/main.9a0ecad0.css.map",
-    "main.04b7e5f9.js.map": "/liminality-admin-cms/static/js/main.04b7e5f9.js.map"
+    "main.baf4ed8a.js.map": "/liminality-admin-cms/static/js/main.baf4ed8a.js.map"
   },
   "entrypoints": [
     "static/css/main.9a0ecad0.css",
-    "static/js/main.04b7e5f9.js"
+    "static/js/main.baf4ed8a.js"
   ]
 }
