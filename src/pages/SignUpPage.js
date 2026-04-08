@@ -46,7 +46,8 @@ export default function SignUpPage() {
       await googleLogin();
       // Navigation is handled by useEffect or the 'done' state check
     } catch (err) {
-      setError('Failed to sign up with Google.');
+      console.error('Google Auth Error:', err);
+      setError('Failed to sign up with Google. ' + (err.message || ''));
     } finally {
       setLoading(false);
     }
