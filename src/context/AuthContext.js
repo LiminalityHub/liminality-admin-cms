@@ -6,8 +6,9 @@ import {
   signOut,
   signInWithPopup,
   GoogleAuthProvider,
+  updateProfile as updateAuthProfile,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 
 const AuthContext = createContext(null);
@@ -18,6 +19,7 @@ export function useAuth() {
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [isApproved, setIsApproved] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -59,6 +61,52 @@ export function AuthProvider({ children }) {
     return signOut(auth);
   }
 
+  async function updateProfileName(name) {
+    const user = auth.currentUser;
+    const trimmedName = name.trim();
+
+    if (!user) {
+      throw new Error('You must be logged in to update your profile.');
+    }
+
+    if (!trimmedName) {
+      throw new Error('Name is required.');
+    }
+
+    const userRef = doc(db, 'users', user.uid);
+    const snapshot = await getDoc(userRef);
+
+    if (snapshot.exists()) {
+      await updateDoc(userRef, {
+        name: trimmedName,
+      });
+    } else {
+      await setDoc(
+        userRef,
+        {
+          email: user.email || '',
+          name: trimmedName,
+          isApproved: false,
+          createdAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+
+    try {
+      await updateAuthProfile(user, { displayName: trimmedName });
+    } catch (error) {
+      console.error('Unable to update Firebase Auth display name:', error);
+    }
+
+    setProfile((prev) => ({
+      ...(prev || {}),
+      email: user.email || '',
+      name: trimmedName,
+      isApproved: prev?.isApproved ?? isApproved,
+    }));
+  }
+
   // Listen to auth state changes and load the Firestore approval status
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -67,11 +115,15 @@ export function AuthProvider({ children }) {
       if (user) {
         try {
           const snap = await getDoc(doc(db, 'users', user.uid));
-          setIsApproved(snap.exists() ? snap.data().isApproved === true : false);
+          const profileData = snap.exists() ? snap.data() : null;
+          setProfile(profileData);
+          setIsApproved(profileData?.isApproved === true);
         } catch {
+          setProfile(null);
           setIsApproved(false);
         }
       } else {
+        setProfile(null);
         setIsApproved(false);
       }
 
@@ -81,7 +133,24 @@ export function AuthProvider({ children }) {
     return unsubscribe;
   }, []);
 
-  const value = { currentUser, isApproved, loading, signup, googleLogin, login, logout };
+  const profileName = profile?.name?.trim() || '';
+  const hasProfileName = profileName.length > 0;
+  const suggestedName = profileName || currentUser?.displayName?.trim() || '';
+
+  const value = {
+    currentUser,
+    profile,
+    profileName,
+    suggestedName,
+    hasProfileName,
+    isApproved,
+    loading,
+    signup,
+    googleLogin,
+    login,
+    logout,
+    updateProfileName,
+  };
 
   return (
     <AuthContext.Provider value={value}>

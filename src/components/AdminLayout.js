@@ -2,7 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 function AdminLayout({ title, children }) {
-  const { logout, currentUser } = useAuth();
+  const { logout, currentUser, profileName } = useAuth();
   const navigate = useNavigate();
 
   async function handleLogout() {
@@ -18,6 +18,8 @@ function AdminLayout({ title, children }) {
           <div className="topbar-actions">
             {currentUser && (
               <>
+                <Link to="/profile" className="button button-outline">Profile</Link>
+                {profileName ? <span className="topbar-email">{profileName}</span> : null}
                 <span className="topbar-email">{currentUser.email}</span>
                 <button className="topbar-logout-btn" onClick={handleLogout}>
                   Sign Out

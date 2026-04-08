@@ -13,6 +13,25 @@ import {
 } from 'firebase/firestore';
 
 const POSTS_COLLECTION = 'posts';
+const USERS_COLLECTION = 'users';
+
+async function getRequiredAuthorProfile() {
+  const user = auth.currentUser;
+
+  if (!user) {
+    throw new Error('You must be logged in to create a post');
+  }
+
+  const userRef = doc(db, USERS_COLLECTION, user.uid);
+  const snapshot = await getDoc(userRef);
+  const profileName = snapshot.data()?.name?.trim();
+
+  if (!profileName) {
+    throw new Error('Complete your profile before writing articles.');
+  }
+
+  return { user, profileName };
+}
 
 export async function fetchPosts() {
   const postsRef = collection(db, POSTS_COLLECTION);
@@ -43,14 +62,12 @@ export async function fetchPostById(id) {
 }
 
 export async function createPost(payload) {
-  const user = auth.currentUser;
-  if (!user) {
-    throw new Error('You must be logged in to create a post');
-  }
+  const { user, profileName } = await getRequiredAuthorProfile();
 
   const now = new Date().toISOString();
   const newPost = {
     ...payload,
+    author: profileName,
     status: payload.status || 'published',
     createdAt: now,
     updatedAt: now,
@@ -65,14 +82,12 @@ export async function createPost(payload) {
 }
 
 export async function updatePost(id, payload) {
-  const user = auth.currentUser;
-  if (!user) {
-    throw new Error('You must be logged in to update a post');
-  }
+  const { profileName } = await getRequiredAuthorProfile();
 
   const postRef = doc(db, POSTS_COLLECTION, id);
   const updatedData = {
     ...payload,
+    author: profileName,
     updatedAt: new Date().toISOString()
   };
 

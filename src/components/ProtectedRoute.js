@@ -11,13 +11,13 @@ import { useAuth } from '../context/AuthContext';
  *   the login page since they shouldn't be here)
  * - Logged in and approved → render children
  */
-export default function ProtectedRoute({ children }) {
+export default function ProtectedRoute({ children, requireProfileName = true }) {
   // DEV BYPASS: skip auth to work on the editor UI
   if (process.env.REACT_APP_DEV_BYPASS_AUTH === 'true') {
     return children;
   }
 
-  const { currentUser, isApproved, loading } = useAuth();
+  const { currentUser, isApproved, loading, hasProfileName } = useAuth();
 
   if (loading) {
     return (
@@ -42,6 +42,10 @@ export default function ProtectedRoute({ children }) {
         </div>
       </div>
     );
+  }
+
+  if (requireProfileName && !hasProfileName) {
+    return <Navigate to="/profile" replace />;
   }
 
   return children;

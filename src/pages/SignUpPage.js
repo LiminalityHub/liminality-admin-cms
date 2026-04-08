@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function SignUpPage() {
-  const { signup, googleLogin, currentUser, isApproved } = useAuth();
+  const { signup, googleLogin, currentUser, isApproved, hasProfileName } = useAuth();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState('');
@@ -57,9 +57,9 @@ export default function SignUpPage() {
     if (currentUser && !isApproved) {
       setDone(true);
     } else if (currentUser && isApproved) {
-      navigate('/posts');
+      navigate(hasProfileName ? '/posts' : '/profile');
     }
-  }, [currentUser, isApproved, navigate]);
+  }, [currentUser, hasProfileName, isApproved, navigate]);
 
   if (done) {
     return (

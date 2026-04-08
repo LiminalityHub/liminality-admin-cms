@@ -9,12 +9,11 @@ const INITIAL_TAGS = [
   "UI", "UX", "Style", "cognitive ergonomics"
 ];
 
-function PostForm({ initialData, submitLabel, onSubmit, isSaving }) {
+function PostForm({ initialData, submitLabel, onSubmit, isSaving, authorName }) {
   const [form, setForm] = useState({
     title: initialData?.title || '',
     excerpt: initialData?.excerpt || '',
     content: initialData?.content || '',
-    author: initialData?.author || '',
     date: initialData?.date || new Date().toISOString().slice(0, 10),
     status: initialData?.status || 'published',
     tags: initialData?.tags || [],
@@ -54,10 +53,10 @@ function PostForm({ initialData, submitLabel, onSubmit, isSaving }) {
       form.title.trim() &&
       form.excerpt.trim() &&
       form.content.trim() &&
-      form.author.trim() &&
+      authorName.trim() &&
       form.date
     );
-  }, [form]);
+  }, [authorName, form]);
 
   const filteredSuggestions = useMemo(() => {
     if (!tagInput.trim()) return [];
@@ -284,7 +283,7 @@ function PostForm({ initialData, submitLabel, onSubmit, isSaving }) {
       <div className="grid-3">
         <label className="field">
           <span>Author</span>
-          <input value={form.author} onChange={(e) => updateField('author', e.target.value)} />
+          <input value={authorName} readOnly />
         </label>
 
         <label className="field">

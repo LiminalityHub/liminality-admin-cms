@@ -3,10 +3,12 @@ import { useNavigate, useParams } from 'react-router-dom';
 import AdminLayout from '../components/AdminLayout';
 import PostForm from '../components/PostForm';
 import { fetchPostById, updatePost } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 
 function EditPostPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { profileName } = useAuth();
 
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -53,6 +55,7 @@ function EditPostPage() {
           submitLabel="Save changes"
           onSubmit={handleUpdate}
           isSaving={saving}
+          authorName={profileName}
         />
       ) : (
         <p className="muted">Post not found.</p>

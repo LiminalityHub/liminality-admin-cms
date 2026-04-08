@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function LoginPage() {
-  const { login, googleLogin, isApproved, currentUser } = useAuth();
+  const { login, googleLogin, isApproved, currentUser, hasProfileName } = useAuth();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState('');
@@ -42,12 +42,12 @@ export default function LoginPage() {
   React.useEffect(() => {
     if (currentUser) {
       if (isApproved) {
-        navigate('/posts');
+        navigate(hasProfileName ? '/posts' : '/profile');
       } else {
         setPendingApproval(true);
       }
     }
-  }, [currentUser, isApproved, navigate]);
+  }, [currentUser, hasProfileName, isApproved, navigate]);
 
   if (pendingApproval) {
     return (

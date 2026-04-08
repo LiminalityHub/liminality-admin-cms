@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import AdminLayout from '../components/AdminLayout';
 import PostForm from '../components/PostForm';
 import { createPost } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 
 function NewPostPage() {
   const navigate = useNavigate();
+  const { profileName } = useAuth();
   const [saving, setSaving] = useState(false);
 
   const handleCreate = async (payload) => {
@@ -20,7 +22,12 @@ function NewPostPage() {
 
   return (
     <AdminLayout title="Create Post">
-      <PostForm submitLabel="Create post" onSubmit={handleCreate} isSaving={saving} />
+      <PostForm
+        submitLabel="Create post"
+        onSubmit={handleCreate}
+        isSaving={saving}
+        authorName={profileName}
+      />
     </AdminLayout>
   );
 }

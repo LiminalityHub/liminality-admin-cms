@@ -4,6 +4,7 @@ import NewPostPage from './pages/NewPostPage';
 import EditPostPage from './pages/EditPostPage';
 import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
+import ProfilePage from './pages/ProfilePage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -14,6 +15,14 @@ function App() {
       <Route path="/signup" element={<SignUpPage />} />
 
       {/* Protected CMS routes */}
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute requireProfileName={false}>
+            <ProfilePage />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/posts"
         element={
