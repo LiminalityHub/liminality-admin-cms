@@ -48,18 +48,35 @@ const YouTube = TiptapNode.create({
   },
 });
 
-/* ── Hidden file picker for images ────────────────────────────────── */
-function pickImageFile() {
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../firebase';
+
+/* ── Hidden file picker for images + Firebase Upload ──────────────── */
+async function pickImageFile() {
   return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       const file = e.target.files?.[0];
       if (!file) { resolve(null); return; }
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.readAsDataURL(file);
+
+      try {
+        // Create a unique filename
+        const filename = `${Date.now()}-${file.name}`;
+        const storageRef = ref(storage, `editor-images/${filename}`);
+        
+        // Upload the file
+        const snapshot = await uploadBytes(storageRef, file);
+        
+        // Get the public URL
+        const downloadURL = await getDownloadURL(snapshot.ref);
+        resolve(downloadURL);
+      } catch (error) {
+        console.error('Upload failed:', error);
+        window.alert('Failed to upload image. Check your Firebase Storage rules.');
+        resolve(null);
+      }
     };
     input.click();
   });
