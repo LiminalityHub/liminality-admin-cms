@@ -164,6 +164,27 @@ function PostForm({ initialData, submitLabel, onSubmit, isSaving }) {
     <form onSubmit={handleSubmit} className="card stack-lg">
       {error ? <p className="error-text">{error}</p> : null}
 
+
+      <div className="grid-3">
+        <label className="field">
+          <span>Author</span>
+          <input value={form.author} onChange={(e) => updateField('author', e.target.value)} />
+        </label>
+
+        <label className="field">
+          <span>Date</span>
+          <input type="date" value={form.date} onChange={(e) => updateField('date', e.target.value)} />
+        </label>
+
+        <label className="field">
+          <span>Status</span>
+          <select value={form.status} onChange={(e) => updateField('status', e.target.value)}>
+            <option value="draft">Draft</option>
+            <option value="published">Published</option>
+          </select>
+        </label>
+      </div>
+      
       <label className="field">
         <span>Title</span>
         <input value={form.title} onChange={(e) => updateField('title', e.target.value)} />
@@ -279,26 +300,6 @@ function PostForm({ initialData, submitLabel, onSubmit, isSaving }) {
       <div className="field">
         <span>Content</span>
         <NotionEditor value={form.content} onChange={(html) => updateField('content', html)} />
-      </div>
-
-      <div className="grid-3">
-        <label className="field">
-          <span>Author</span>
-          <input value={form.author} onChange={(e) => updateField('author', e.target.value)} />
-        </label>
-
-        <label className="field">
-          <span>Date</span>
-          <input type="date" value={form.date} onChange={(e) => updateField('date', e.target.value)} />
-        </label>
-
-        <label className="field">
-          <span>Status</span>
-          <select value={form.status} onChange={(e) => updateField('status', e.target.value)}>
-            <option value="draft">Draft</option>
-            <option value="published">Published</option>
-          </select>
-        </label>
       </div>
 
       <div>
