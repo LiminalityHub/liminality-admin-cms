@@ -5,6 +5,7 @@
   "homepage": "https://LiminalityHub.github.io/liminality-admin-cms",
   "description": "Admin frontend for Liminality blog",
   "dependencies": {
+    "@supabase/supabase-js": "^2.103.0",
     "@tiptap/extension-bubble-menu": "^3.20.1",
     "@tiptap/extension-image": "^3.20.1",
     "@tiptap/extension-placeholder": "^3.20.1",
@@ -12,7 +13,6 @@
     "@tiptap/pm": "^3.20.1",
     "@tiptap/react": "^3.20.1",
     "@tiptap/starter-kit": "^3.20.1",
-    "firebase": "^12.10.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.20.0",

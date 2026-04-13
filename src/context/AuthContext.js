@@ -1,15 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import {
-  createUserWithEmailAndPassword,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut,
-  signInWithPopup,
-  GoogleAuthProvider,
-  updateProfile as updateAuthProfile,
-} from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
-import { auth, db } from '../firebase';
+import { supabase } from '../supabase';
 
 const AuthContext = createContext(null);
 
@@ -23,46 +13,57 @@ export function AuthProvider({ children }) {
   const [isApproved, setIsApproved] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Sign up: create Firebase Auth account + Firestore profile
+  // Sign up: create Supabase Auth account + users profile record
   async function signup(email, password) {
-    const credential = await createUserWithEmailAndPassword(auth, email, password);
-    await setDoc(doc(db, 'users', credential.user.uid), {
+    const { data, error } = await supabase.auth.signUp({
       email,
-      isApproved: false,
-      createdAt: serverTimestamp(),
+      password,
     });
-    return credential;
-  }
-
-  // Google Login: create Firestore profile if first time
-  async function googleLogin() {
-    const provider = new GoogleAuthProvider();
-    const credential = await signInWithPopup(auth, provider);
-    const userDocRef = doc(db, 'users', credential.user.uid);
-    const userDoc = await getDoc(userDocRef);
-
-    if (!userDoc.exists()) {
-      await setDoc(userDocRef, {
-        email: credential.user.email,
-        isApproved: false,
-        createdAt: serverTimestamp(),
-      });
+    if (error) throw error;
+    
+    // In Supabase, we might use a trigger to create the profile, 
+    // but here we'll manually create it to match previous logic
+    if (data.user) {
+      const { error: profileError } = await supabase
+        .from('users')
+        .insert([{ 
+          id: data.user.id, 
+          email, 
+          is_approved: false 
+        }]);
+      if (profileError) console.error('Error creating profile:', profileError);
     }
-    return credential;
+    
+    return data;
   }
 
-  // Login: Firebase Auth only — approval is checked via onAuthStateChanged
-  function login(email, password) {
-    return signInWithEmailAndPassword(auth, email, password);
+  // Google Login
+  async function googleLogin() {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  // Login
+  async function login(email, password) {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) throw error;
+    return data;
   }
 
   // Logout
-  function logout() {
-    return signOut(auth);
+  async function logout() {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
   }
 
   async function updateProfileName(name) {
-    const user = auth.currentUser;
+    const { data: { user } } = await supabase.auth.getUser();
     const trimmedName = name.trim();
 
     if (!user) {
@@ -73,52 +74,54 @@ export function AuthProvider({ children }) {
       throw new Error('Name is required.');
     }
 
-    const userRef = doc(db, 'users', user.uid);
-    const snapshot = await getDoc(userRef);
-
-    if (snapshot.exists()) {
-      await updateDoc(userRef, {
+    const { error } = await supabase
+      .from('users')
+      .upsert({
+        id: user.id,
+        email: user.email || '',
         name: trimmedName,
-      });
-    } else {
-      await setDoc(
-        userRef,
-        {
-          email: user.email || '',
-          name: trimmedName,
-          isApproved: false,
-          createdAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
-    }
+        // We don't want to reset is_approved if it's already set
+      }, { onConflict: 'id' });
 
-    try {
-      await updateAuthProfile(user, { displayName: trimmedName });
-    } catch (error) {
-      console.error('Unable to update Firebase Auth display name:', error);
-    }
+    if (error) throw error;
 
     setProfile((prev) => ({
       ...(prev || {}),
       email: user.email || '',
       name: trimmedName,
-      isApproved: prev?.isApproved ?? isApproved,
+      is_approved: prev?.is_approved ?? isApproved,
     }));
   }
 
-  // Listen to auth state changes and load the Firestore approval status
+  // Listen to auth state changes and load the users table profile status
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user);
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      handleAuthChange(session?.user ?? null);
+    });
 
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      handleAuthChange(session?.user ?? null);
+    });
+
+    async function handleAuthChange(user) {
+      setCurrentUser(user);
       if (user) {
         try {
-          const snap = await getDoc(doc(db, 'users', user.uid));
-          const profileData = snap.exists() ? snap.data() : null;
-          setProfile(profileData);
-          setIsApproved(profileData?.isApproved === true);
-        } catch {
+          const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+          
+          if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+             console.error('Error fetching profile:', error);
+          }
+
+          setProfile(data);
+          setIsApproved(data?.is_approved === true);
+        } catch (err) {
+          console.error('Profile fetch catch:', err);
           setProfile(null);
           setIsApproved(false);
         }
@@ -126,16 +129,16 @@ export function AuthProvider({ children }) {
         setProfile(null);
         setIsApproved(false);
       }
-
       setLoading(false);
-    });
+    }
 
-    return unsubscribe;
+    return () => subscription.unsubscribe();
   }, []);
 
   const profileName = profile?.name?.trim() || '';
   const hasProfileName = profileName.length > 0;
-  const suggestedName = profileName || currentUser?.displayName?.trim() || '';
+  // Supabase user metadata can also store full_name
+  const suggestedName = profileName || currentUser?.user_metadata?.full_name || '';
 
   const value = {
     currentUser,

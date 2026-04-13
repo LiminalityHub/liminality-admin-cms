@@ -29,10 +29,10 @@ export default function SignUpPage() {
       await signup(email, password);
       setDone(true);
     } catch (err) {
-      if (err.code === 'auth/email-already-in-use') {
+      if (err.message && err.message.toLowerCase().includes('already registered')) {
         setError('This email is already registered. Try logging in.');
       } else {
-        setError('Failed to create account. Please try again.');
+        setError(err.message || 'Failed to create account. Please try again.');
       }
     } finally {
       setLoading(false);

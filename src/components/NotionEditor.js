@@ -6,6 +6,7 @@ import Placeholder from '@tiptap/extension-placeholder';
 import Underline from '@tiptap/extension-underline';
 import Image from '@tiptap/extension-image';
 import './NotionEditor.css';
+import { supabase } from '../supabase';
 
 /* ── YouTube URL helper ───────────────────────────────────────────── */
 function extractYouTubeId(url) {
@@ -48,35 +49,38 @@ const YouTube = TiptapNode.create({
   },
 });
 
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../firebase';
+/* ── Hidden file picker for images + Supabase Upload ──────────────── */
+async function uploadToSupabase(file) {
+  try {
+    const filename = `${Date.now()}-${file.name}`;
+    const filePath = `editor-images/${filename}`;
+    
+    const { data, error } = await supabase.storage
+      .from('images') // Assumes a bucket named 'images'
+      .upload(filePath, file);
 
-/* ── Hidden file picker for images + Firebase Upload ──────────────── */
-async function pickImageFile() {
+    if (error) throw error;
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('images')
+      .getPublicUrl(filePath);
+
+    return publicUrl;
+  } catch (error) {
+    console.error('Upload failed:', error);
+    window.alert('Failed to upload image. Check your Supabase Storage policies.');
+    return null;
+  }
+}
+
+function pickImageFile() {
   return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.onchange = async (e) => {
+    input.onchange = (e) => {
       const file = e.target.files?.[0];
-      if (!file) { resolve(null); return; }
-
-      try {
-        // Create a unique filename
-        const filename = `${Date.now()}-${file.name}`;
-        const storageRef = ref(storage, `editor-images/${filename}`);
-        
-        // Upload the file
-        const snapshot = await uploadBytes(storageRef, file);
-        
-        // Get the public URL
-        const downloadURL = await getDownloadURL(snapshot.ref);
-        resolve(downloadURL);
-      } catch (error) {
-        console.error('Upload failed:', error);
-        window.alert('Failed to upload image. Check your Firebase Storage rules.');
-        resolve(null);
-      }
+      resolve(file || null);
     };
     input.click();
   });
@@ -88,7 +92,7 @@ const BLOCK_TYPES = [
   { label: 'Text',           icon: 'Aa',  action: (e) => e.chain().focus().setParagraph().run() },
   { label: 'Heading 1',      icon: 'H1',  action: (e) => e.chain().focus().toggleHeading({ level: 1 }).run() },
   { label: 'Heading 2',      icon: 'H2',  action: (e) => e.chain().focus().toggleHeading({ level: 2 }).run() },
-  { label: 'Heading 3',      icon: 'H3',  action: (e) => e.chain().focus().toggleHeading({ level: 3 }).run() },
+  { label: 'Heading 3',      icon: 'H3',  action: (e) => e.chain().focus().toggleHeading({ level: 1 }).run() },
   { label: 'Bullet List',    icon: '•',   action: (e) => e.chain().focus().toggleBulletList().run() },
   { label: 'Numbered List',  icon: '1.',  action: (e) => e.chain().focus().toggleOrderedList().run() },
   { label: 'Quote',          icon: '"',   action: (e) => e.chain().focus().toggleBlockquote().run() },
@@ -118,8 +122,11 @@ const SLASH_ITEMS = [
   { label: 'Code Block',     icon: '</>',  action: (e) => e.chain().focus().toggleCodeBlock().run() },
   { label: 'Divider',        icon: '—',   action: (e) => e.chain().focus().setHorizontalRule().run() },
   { label: 'Image',          icon: '🖼',  action: async (e) => {
-    const dataUrl = await pickImageFile();
-    if (dataUrl) e.chain().focus().setImage({ src: dataUrl }).run();
+    const file = await pickImageFile();
+    if (file) {
+      const downloadURL = await uploadToSupabase(file);
+      if (downloadURL) e.chain().focus().setImage({ src: downloadURL }).run();
+    }
   }},
   { label: 'YouTube Video',  icon: '▶',  action: (e) => {
     const url = window.prompt('Paste YouTube URL');

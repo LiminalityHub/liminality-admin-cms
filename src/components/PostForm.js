@@ -1,6 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
-import { collection, getDocs, setDoc, doc, deleteDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { supabase } from '../supabase';
 import NotionEditor from './NotionEditor';
 
 const INITIAL_TAGS = [
@@ -30,8 +29,13 @@ function PostForm({ initialData, submitLabel, onSubmit, isSaving, authorName }) 
   useEffect(() => {
     const fetchTags = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, 'tags'));
-        const fetchedTags = querySnapshot.docs.map(doc => doc.data().name);
+        const { data, error } = await supabase
+          .from('tags')
+          .select('name');
+        
+        if (error) throw error;
+
+        const fetchedTags = data.map(t => t.name);
         setAvailableTags(prev => {
           const combined = [...new Set([...prev, ...fetchedTags])];
           return combined;
@@ -88,16 +92,21 @@ function PostForm({ initialData, submitLabel, onSubmit, isSaving, authorName }) 
   const deleteCustomTag = async (tagToDelete) => {
     try {
       setError('');
-      await deleteDoc(doc(db, 'tags', tagToDelete.toLowerCase()));
+      const { error } = await supabase
+        .from('tags')
+        .delete()
+        .eq('name', tagToDelete); // Or use an ID if available
+
+      if (error) throw error;
+
       setAvailableTags(prev => prev.filter(t => t !== tagToDelete));
-      // Also remove it from current post if it was selected
       setForm(prev => ({
         ...prev,
         tags: prev.tags.filter(t => t !== tagToDelete)
       }));
     } catch (e) {
-      console.error('Firestore Delete Error:', e.code, e.message);
-      setError(`Failed to delete tag: ${e.code === 'permission-denied' ? 'Permission denied. Check your Firebase Rules.' : e.message}`);
+      console.error('Supabase Delete Error:', e);
+      setError(`Failed to delete tag: ${e.message}`);
     }
   };
 
@@ -117,23 +126,22 @@ function PostForm({ initialData, submitLabel, onSubmit, isSaving, authorName }) 
       return;
     }
 
-    // Add to current post immediately for snappy UX
     setForm(prev => ({ ...prev, tags: [...prev.tags, cleanTag] }));
     setTagInput('');
     setShowSuggestions(false);
     setError('');
 
-    // Check if it's a new global tag and persist if needed
     const isNewGlobal = !availableTags.some(t => t.toLowerCase() === cleanTag.toLowerCase());
     if (isNewGlobal) {
       try {
         setAvailableTags(prev => [...prev, cleanTag]);
-        // Use lowercase as ID to avoid duplicates like "iOS" vs "ios"
-        await setDoc(doc(db, 'tags', cleanTag.toLowerCase()), {
-          name: cleanTag
-        });
+        const { error } = await supabase
+          .from('tags')
+          .insert([{ name: cleanTag }]);
+        
+        if (error) throw error;
       } catch (e) {
-        console.error('Error saving new tag to Firestore:', e);
+        console.error('Error saving new tag to Supabase:', e);
       }
     }
   };

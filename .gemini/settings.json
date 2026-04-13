@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "url": "https://mcp.supabase.com/mcp?project_ref=uwzmmxsemsssctlqnwvu&service_role_key=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV3em1teHNlbXNzc2N0bHFud3Z1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjA4MTQwNSwiZXhwIjoyMDkxNjU3NDA1fQ.VrWlc2t4anEcxUrxCkjMGrJrvKB88C2h1exlONCGFLU",
+      "type": "http"
+    },
+    "supabase-fixed": {
+      "url": "https://mcp.supabase.com/mcp?project_ref=uwzmmxsemsssctlqnwvu&service_role_key=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV3em1teHNlbXNzc2N0bHFud3Z1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjA4MTQwNSwiZXhwIjoyMDkxNjU3NDA1fQ.VrWlc2t4anEcxUrxCkjMGrJrvKB88C2h1exlONCGFLU",
+      "type": "http"
+    }
+  }
+}

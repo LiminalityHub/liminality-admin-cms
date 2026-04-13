@@ -20,7 +20,7 @@ export default function LoginPage() {
     try {
       await login(email, password);
     } catch (err) {
-      setError('Failed to log in. Please check your credentials.');
+      setError(err.message || 'Failed to log in. Please check your credentials.');
     } finally {
       setLoading(false);
     }

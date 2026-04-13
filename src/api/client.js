@@ -1,64 +1,55 @@
-import { db, auth } from '../firebase';
-import { 
-  collection, 
-  getDocs, 
-  getDoc, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
-  query, 
-  orderBy,
-  where
-} from 'firebase/firestore';
+import { supabase } from '../supabase';
 
-const POSTS_COLLECTION = 'posts';
-const USERS_COLLECTION = 'users';
+const POSTS_TABLE = 'posts';
+const USERS_TABLE = 'users';
 
 async function getRequiredAuthorProfile() {
-  const user = auth.currentUser;
+  const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
     throw new Error('You must be logged in to create a post');
   }
 
-  const userRef = doc(db, USERS_COLLECTION, user.uid);
-  const snapshot = await getDoc(userRef);
-  const profileName = snapshot.data()?.name?.trim();
+  const { data: profile, error } = await supabase
+    .from(USERS_TABLE)
+    .select('name')
+    .eq('id', user.id)
+    .single();
 
-  if (!profileName) {
+  if (error || !profile?.name?.trim()) {
     throw new Error('Complete your profile before writing articles.');
   }
 
-  return { user, profileName };
+  return { user, profileName: profile.name.trim() };
 }
 
 export async function fetchPosts() {
-  const postsRef = collection(db, POSTS_COLLECTION);
-  // Sort by date descending
-  const q = query(postsRef, orderBy('date', 'desc'));
-  const snapshot = await getDocs(q);
+  const { data, error } = await supabase
+    .from(POSTS_TABLE)
+    .select('*')
+    .order('date', { ascending: false });
   
-  return snapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  }));
+  if (error) throw error;
+  return data;
 }
 
 export async function fetchPostById(id) {
-  const postRef = doc(db, POSTS_COLLECTION, id);
-  const snapshot = await getDoc(postRef);
+  const { data, error } = await supabase
+    .from(POSTS_TABLE)
+    .select('*')
+    .eq('id', id)
+    .single();
   
-  if (!snapshot.exists()) {
-    const error = new Error('Post not found');
-    error.status = 404;
+  if (error) {
+    if (error.code === 'PGRST116') {
+      const err = new Error('Post not found');
+      err.status = 404;
+      throw err;
+    }
     throw error;
   }
   
-  return {
-    id: snapshot.id,
-    ...snapshot.data()
-  };
+  return data;
 }
 
 export async function createPost(payload) {
@@ -69,45 +60,52 @@ export async function createPost(payload) {
     ...payload,
     author: profileName,
     status: payload.status || 'published',
-    createdAt: now,
-    updatedAt: now,
-    authorId: user.uid
+    created_at: now,
+    updated_at: now,
+    author_id: user.id
   };
 
-  const docRef = await addDoc(collection(db, POSTS_COLLECTION), newPost);
-  return {
-    id: docRef.id,
-    ...newPost
-  };
+  const { data, error } = await supabase
+    .from(POSTS_TABLE)
+    .insert([newPost])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
 }
 
 export async function updatePost(id, payload) {
   const { profileName } = await getRequiredAuthorProfile();
 
-  const postRef = doc(db, POSTS_COLLECTION, id);
   const updatedData = {
     ...payload,
     author: profileName,
-    updatedAt: new Date().toISOString()
+    updated_at: new Date().toISOString()
   };
 
-  await updateDoc(postRef, updatedData);
-  
-  // Return the merged data
-  const snapshot = await getDoc(postRef);
-  return {
-    id: snapshot.id,
-    ...snapshot.data()
-  };
+  const { data, error } = await supabase
+    .from(POSTS_TABLE)
+    .update(updatedData)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
 }
 
 export async function deletePost(id) {
-  const user = auth.currentUser;
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     throw new Error('You must be logged in to delete a post');
   }
 
-  const postRef = doc(db, POSTS_COLLECTION, id);
-  await deleteDoc(postRef);
+  const { error } = await supabase
+    .from(POSTS_TABLE)
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
   return true;
 }
