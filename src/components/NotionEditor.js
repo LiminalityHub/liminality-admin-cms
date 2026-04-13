@@ -54,11 +54,11 @@ const YouTube = TiptapNode.create({
 async function uploadToSupabase(file) {
   let finalFile = file;
 
-  // Automatically compress images larger than 200KB
-  if (file.size > 200 * 1024) {
+  // Automatically compress images larger than 500KB
+  if (file.size > 500 * 1024) {
     const options = {
-      maxSizeMB: 0.19, // slightly under 200KB (0.2MB)
-      maxWidthOrHeight: 1920,
+      maxSizeMB: 0.49, // slightly under 500KB (0.5MB)
+      maxWidthOrHeight: 2560, // 2.5K resolution
       useWebWorker: true,
     };
     try {
@@ -66,9 +66,9 @@ async function uploadToSupabase(file) {
       console.log(`Compressed: from ${(file.size / 1024).toFixed(1)}KB to ${(finalFile.size / 1024).toFixed(1)}KB`);
     } catch (error) {
       console.error('Compression failed:', error);
-      // Fallback: if compression fails and it's still > 200KB, warn and stop
-      if (file.size > 200 * 1024) {
-        window.alert('Failed to compress image below 200KB limit.');
+      // Fallback: if compression fails and it's still > 500KB, warn and stop
+      if (file.size > 500 * 1024) {
+        window.alert('Failed to compress image below 500KB limit.');
         return null;
       }
     }
