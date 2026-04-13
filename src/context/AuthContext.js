@@ -31,7 +31,9 @@ export function AuthProvider({ children }) {
           email, 
           is_approved: false 
         }]);
-      if (profileError) console.error('Error creating profile:', profileError);
+      // Note: If this fails (e.g. email confirmation required), 
+      // handleAuthChange will try to create it later.
+      if (profileError) console.warn('Initial profile creation failed (normal if email confirmation is required):', profileError.message);
     }
     
     return data;
@@ -108,13 +110,34 @@ export function AuthProvider({ children }) {
       setCurrentUser(user);
       if (user) {
         try {
-          const { data, error } = await supabase
+          // 1. Try to fetch the profile
+          let { data, error } = await supabase
             .from('users')
             .select('*')
             .eq('id', user.id)
             .single();
           
-          if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+          // 2. Fallback: If no profile exists (PGRST116), try to create it now
+          // This handles cases where signup insert failed or Google Login was used
+          if (error && error.code === 'PGRST116') {
+             console.log('No profile found, creating one for:', user.email);
+             const { data: newProfile, error: insertError } = await supabase
+               .from('users')
+               .upsert([{ 
+                 id: user.id, 
+                 email: user.email, 
+                 is_approved: false 
+               }], { onConflict: 'id' })
+               .select()
+               .single();
+             
+             if (!insertError) {
+               data = newProfile;
+               error = null;
+             } else {
+               console.error('Failed to create fallback profile:', insertError);
+             }
+          } else if (error) {
              console.error('Error fetching profile:', error);
           }
 
