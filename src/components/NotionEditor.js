@@ -83,7 +83,9 @@ async function uploadToSupabase(file) {
   }
 
   try {
-    const filename = `${Date.now()}-${finalFile.name}`;
+    // Sanitize filename: remove spaces and special characters that cause "Invalid key" errors
+    const originalName = (file.name || 'image.jpg').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '');
+    const filename = `${Date.now()}-${originalName}`;
     const filePath = `editor-images/${filename}`;
     
     const { data, error } = await supabase.storage
@@ -99,7 +101,8 @@ async function uploadToSupabase(file) {
     return publicUrl;
   } catch (error) {
     console.error('Upload failed:', error);
-    window.alert('Failed to upload image. Check your Supabase Storage policies.');
+    // Show the actual error message to help debugging
+    window.alert(`Failed to upload image: ${error.message || error.error_description || 'Unknown error'}`);
     return null;
   }
 }
