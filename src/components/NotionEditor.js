@@ -289,7 +289,7 @@ export default function NotionEditor({ value, onChange }) {
 
   // Handle slash trigger and navigation
   useEffect(() => {
-    if (!editor) return;
+    if (!editor || editor.isDestroyed || !editor.view) return;
 
     const handleKeyDown = (event) => {
       if (slashOpen) {
@@ -320,14 +320,19 @@ export default function NotionEditor({ value, onChange }) {
 
     const editorEl = editor.view.dom;
     editorEl.addEventListener('keydown', handleKeyDown);
-    return () => editorEl.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      if (editor && !editor.isDestroyed && editor.view) {
+        editorEl.removeEventListener('keydown', handleKeyDown);
+      }
+    };
   }, [editor, slashOpen, slashIndex, filteredItems, selectSlashItem, closeSlash]);
 
   // Watch for slash character input
   useEffect(() => {
-    if (!editor) return;
+    if (!editor || editor.isDestroyed || !editor.view) return;
 
     const handleTransaction = () => {
+      if (editor.isDestroyed || !editor.view) return;
       const { state } = editor;
       const { from } = state.selection;
       const textBefore = state.doc.textBetween(
@@ -364,14 +369,19 @@ export default function NotionEditor({ value, onChange }) {
     };
 
     editor.on('transaction', handleTransaction);
-    return () => editor.off('transaction', handleTransaction);
+    return () => {
+      if (!editor.isDestroyed) {
+        editor.off('transaction', handleTransaction);
+      }
+    };
   }, [editor, slashOpen, closeSlash]);
 
   // Track current block for the handle button
   useEffect(() => {
-    if (!editor) return;
+    if (!editor || editor.isDestroyed || !editor.view) return;
 
     const updateHandle = () => {
+      if (editor.isDestroyed || !editor.view) return;
       const { from } = editor.state.selection;
       const resolvedPos = editor.state.doc.resolve(from);
       const blockStart = resolvedPos.start(1);
@@ -388,8 +398,10 @@ export default function NotionEditor({ value, onChange }) {
     editor.on('selectionUpdate', updateHandle);
     editor.on('focus', updateHandle);
     return () => {
-      editor.off('selectionUpdate', updateHandle);
-      editor.off('focus', updateHandle);
+      if (!editor.isDestroyed) {
+        editor.off('selectionUpdate', updateHandle);
+        editor.off('focus', updateHandle);
+      }
     };
   }, [editor]);
 
@@ -498,28 +510,35 @@ export default function NotionEditor({ value, onChange }) {
 
   // Watch for text selection to show/hide floating toolbar
   useEffect(() => {
-    if (!editor) return;
+    if (!editor || editor.isDestroyed || !editor.view) return;
 
     const handleSelectionUpdate = () => {
+      if (editor.isDestroyed || !editor.view) return;
       const { from, to } = editor.state.selection;
       if (from === to) {
         setToolbarVisible(false);
         return;
       }
-      const coords = editor.view.coordsAtPos(from);
-      const editorRect = editor.view.dom.closest('.notion-editor-wrap').getBoundingClientRect();
-      setToolbarPos({
-        top: coords.top - editorRect.top - 44,
-        left: coords.left - editorRect.left,
-      });
-      setToolbarVisible(true);
+      try {
+        const coords = editor.view.coordsAtPos(from);
+        const editorRect = editor.view.dom.closest('.notion-editor-wrap').getBoundingClientRect();
+        setToolbarPos({
+          top: coords.top - editorRect.top - 44,
+          left: coords.left - editorRect.left,
+        });
+        setToolbarVisible(true);
+      } catch {
+        setToolbarVisible(false);
+      }
     };
 
     editor.on('selectionUpdate', handleSelectionUpdate);
     editor.on('blur', () => setToolbarVisible(false));
     return () => {
-      editor.off('selectionUpdate', handleSelectionUpdate);
-      editor.off('blur', () => setToolbarVisible(false));
+      if (!editor.isDestroyed) {
+        editor.off('selectionUpdate', handleSelectionUpdate);
+        editor.off('blur', () => setToolbarVisible(false));
+      }
     };
   }, [editor]);
 
