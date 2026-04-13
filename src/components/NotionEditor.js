@@ -7,6 +7,7 @@ import Underline from '@tiptap/extension-underline';
 import Image from '@tiptap/extension-image';
 import './NotionEditor.css';
 import { supabase } from '../supabase';
+import imageCompression from 'browser-image-compression';
 
 /* ── YouTube URL helper ───────────────────────────────────────────── */
 function extractYouTubeId(url) {
@@ -51,13 +52,35 @@ const YouTube = TiptapNode.create({
 
 /* ── Hidden file picker for images + Supabase Upload ──────────────── */
 async function uploadToSupabase(file) {
+  let finalFile = file;
+
+  // Automatically compress images larger than 200KB
+  if (file.size > 200 * 1024) {
+    const options = {
+      maxSizeMB: 0.19, // slightly under 200KB (0.2MB)
+      maxWidthOrHeight: 1920,
+      useWebWorker: true,
+    };
+    try {
+      finalFile = await imageCompression(file, options);
+      console.log(`Compressed: from ${(file.size / 1024).toFixed(1)}KB to ${(finalFile.size / 1024).toFixed(1)}KB`);
+    } catch (error) {
+      console.error('Compression failed:', error);
+      // Fallback: if compression fails and it's still > 200KB, warn and stop
+      if (file.size > 200 * 1024) {
+        window.alert('Failed to compress image below 200KB limit.');
+        return null;
+      }
+    }
+  }
+
   try {
-    const filename = `${Date.now()}-${file.name}`;
+    const filename = `${Date.now()}-${finalFile.name}`;
     const filePath = `editor-images/${filename}`;
     
     const { data, error } = await supabase.storage
-      .from('images') // Assumes a bucket named 'images'
-      .upload(filePath, file);
+      .from('images')
+      .upload(filePath, finalFile);
 
     if (error) throw error;
 
