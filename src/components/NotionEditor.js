@@ -58,53 +58,31 @@ const YouTube = TiptapNode.create({
   },
 });
 
-/* ── Hidden file picker for images + Supabase Upload ──────────────── */
-async function uploadToSupabase(file) {
-  let finalFile = file;
-
+/* ── Image handling helpers ────────────────────────────────────────── */
+async function compressImage(file) {
   // Automatically compress images larger than 500KB
   if (file.size > 500 * 1024) {
     const options = {
-      maxSizeMB: 0.49, // slightly under 500KB (0.5MB)
-      maxWidthOrHeight: 2560, // 2.5K resolution
+      maxSizeMB: 0.49,
+      maxWidthOrHeight: 2560,
       useWebWorker: true,
     };
     try {
-      finalFile = await imageCompression(file, options);
-      console.log(`Compressed: from ${(file.size / 1024).toFixed(1)}KB to ${(finalFile.size / 1024).toFixed(1)}KB`);
+      return await imageCompression(file, options);
     } catch (error) {
       console.error('Compression failed:', error);
-      // Fallback: if compression fails and it's still > 500KB, warn and stop
-      if (file.size > 500 * 1024) {
-        window.alert('Failed to compress image below 500KB limit.');
-        return null;
-      }
     }
   }
+  return file;
+}
 
-  try {
-    // Sanitize filename: remove spaces and special characters that cause "Invalid key" errors
-    const originalName = (file.name || 'image.jpg').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '');
-    const filename = `${Date.now()}-${originalName}`;
-    const filePath = `editor-images/${filename}`;
-    
-    const { data, error } = await supabase.storage
-      .from('images')
-      .upload(filePath, finalFile);
-
-    if (error) throw error;
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('images')
-      .getPublicUrl(filePath);
-
-    return publicUrl;
-  } catch (error) {
-    console.error('Upload failed:', error);
-    // Show the actual error message to help debugging
-    window.alert(`Failed to upload image: ${error.message || error.error_description || 'Unknown error'}`);
-    return null;
-  }
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 function pickImageFile() {
@@ -158,8 +136,9 @@ const SLASH_ITEMS = [
   { label: 'Image',          icon: '🖼',  action: async (e) => {
     const file = await pickImageFile();
     if (file) {
-      const downloadURL = await uploadToSupabase(file);
-      if (downloadURL) e.chain().focus().setImage({ src: downloadURL }).run();
+      const compressed = await compressImage(file);
+      const dataUrl = await fileToDataUrl(compressed);
+      e.chain().focus().setImage({ src: dataUrl }).run();
     }
   }},
   { label: 'YouTube Video',  icon: '▶',  action: (e) => {
