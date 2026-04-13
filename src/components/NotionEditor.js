@@ -9,6 +9,14 @@ import './NotionEditor.css';
 import { supabase } from '../supabase';
 import imageCompression from 'browser-image-compression';
 
+/* ── Image URL helper ───────────────────────────────────────────── */
+function getImagesFromHtml(html) {
+  const div = document.createElement('div');
+  div.innerHTML = html || '';
+  const imgs = Array.from(div.querySelectorAll('img'));
+  return imgs.map(img => img.src).filter(src => src.includes('supabase.co/storage/v1/object/public/images/'));
+}
+
 /* ── YouTube URL helper ───────────────────────────────────────────── */
 function extractYouTubeId(url) {
   const match = url.match(
@@ -196,6 +204,9 @@ export default function NotionEditor({ value, onChange }) {
   const [slashIndex, setSlashIndex] = useState(0);
   const slashStartPos = useRef(null);
 
+  // Track images in current content to detect deletions
+  const currentImages = useRef(getImagesFromHtml(value));
+
   // Floating toolbar state
   const [toolbarVisible, setToolbarVisible] = useState(false);
   const [toolbarPos, setToolbarPos] = useState({ top: 0, left: 0 });
@@ -224,7 +235,30 @@ export default function NotionEditor({ value, onChange }) {
     ],
     content: value || '',
     onUpdate({ editor: ed }) {
-      onChange(ed.getHTML());
+      const newHtml = ed.getHTML();
+      onChange(newHtml);
+
+      // Compare images to find deletions
+      const newImages = getImagesFromHtml(newHtml);
+      const deletedImages = currentImages.current.filter(src => !newImages.includes(src));
+
+      if (deletedImages.length > 0) {
+        deletedImages.forEach(async (src) => {
+          try {
+            // Extract the file path from the URL
+            // Format: https://...supabase.co/storage/v1/object/public/images/editor-images/filename.jpg
+            const pathParts = src.split('/images/');
+            if (pathParts.length > 1) {
+              const filePath = decodeURIComponent(pathParts[1]);
+              console.log('Deleting removed image from storage:', filePath);
+              await supabase.storage.from('images').remove([filePath]);
+            }
+          } catch (error) {
+            console.error('Failed to delete image from storage:', error);
+          }
+        });
+      }
+      currentImages.current = newImages;
     },
     onCreate({ editor: ed }) {
       // Debug: verify youtube node registered
