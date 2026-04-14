@@ -12,6 +12,7 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [isApproved, setIsApproved] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isRecovery, setIsRecovery] = useState(false);
 
   // Sign up: create Supabase Auth account + users profile record
   async function signup(email, password) {
@@ -39,13 +40,17 @@ export function AuthProvider({ children }) {
     return data;
   }
 
-  // Google Login
-  async function googleLogin() {
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-    });
+  // Password reset
+  async function resetPassword(email) {
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
     if (error) throw error;
-    return data;
+  }
+
+  // Update password (used after recovery)
+  async function updatePassword(newPassword) {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+    setIsRecovery(false);
   }
 
   // Login
@@ -102,7 +107,10 @@ export function AuthProvider({ children }) {
       handleAuthChange(session?.user ?? null);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecovery(true);
+      }
       handleAuthChange(session?.user ?? null);
     });
 
@@ -170,11 +178,13 @@ export function AuthProvider({ children }) {
     suggestedName,
     hasProfileName,
     isApproved,
+    isRecovery,
     loading,
     signup,
-    googleLogin,
     login,
     logout,
+    resetPassword,
+    updatePassword,
     updateProfileName,
   };
 

@@ -4,15 +4,26 @@ import NewPostPage from './pages/NewPostPage';
 import EditPostPage from './pages/EditPostPage';
 import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import ProfilePage from './pages/ProfilePage';
 import ProtectedRoute from './components/ProtectedRoute';
+import { useAuth } from './context/AuthContext';
 
 function App() {
+  const { isRecovery } = useAuth();
+
+  // If the user arrived via a password reset link, show the reset form
+  if (isRecovery) {
+    return <ResetPasswordPage />;
+  }
+
   return (
     <Routes>
       {/* Public auth routes */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignUpPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
       {/* Protected CMS routes */}
       <Route
