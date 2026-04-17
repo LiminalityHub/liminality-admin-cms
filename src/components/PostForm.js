@@ -1,6 +1,7 @@
-import { useMemo, useState, useRef, useEffect } from 'react';
+import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '../supabase';
 import NotionEditor from './NotionEditor';
+import { parseMediumArticle } from '../utils/mediumParser';
 
 const INITIAL_TAGS = [
   "visionOS", "machine learning", "LLM", "design", "iOS",
@@ -23,6 +24,10 @@ function PostForm({ initialData, submitLabel, onSubmit, isSaving, authorName }) 
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showManageMenu, setShowManageMenu] = useState(false);
   const [error, setError] = useState('');
+  const [mediumUrl, setMediumUrl] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState('');
+  const [editorKey, setEditorKey] = useState(0);
   const suggestionsRef = useRef(null);
   const manageMenuRef = useRef(null);
 
@@ -153,6 +158,29 @@ function PostForm({ initialData, submitLabel, onSubmit, isSaving, authorName }) 
     }));
   };
 
+  const handleMediumImport = useCallback(async () => {
+    if (!mediumUrl.trim() || importing) return;
+    setImporting(true);
+    setImportError('');
+    try {
+      const data = await parseMediumArticle(mediumUrl);
+      setForm((prev) => ({
+        ...prev,
+        title: data.title || prev.title,
+        excerpt: data.excerpt || prev.excerpt,
+        content: data.content || prev.content,
+        tags: data.tags.length > 0 ? data.tags.slice(0, 3) : prev.tags,
+      }));
+      // Force editor to re-mount with new content
+      setEditorKey((k) => k + 1);
+      setMediumUrl('');
+    } catch (err) {
+      setImportError(err.message || 'Import failed.');
+    } finally {
+      setImporting(false);
+    }
+  }, [mediumUrl, importing]);
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!isValid) {
@@ -169,6 +197,37 @@ function PostForm({ initialData, submitLabel, onSubmit, isSaving, authorName }) 
 
   return (
     <form onSubmit={handleSubmit} className="card stack-lg">
+      {/* Medium import bar — only show on new posts */}
+      {!initialData && (
+        <div className="medium-import-bar">
+          <div className="medium-import-label">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 12h16M4 12l4-4M4 12l4 4"/>
+            </svg>
+            <span>Import from Medium</span>
+          </div>
+          <div className="medium-import-row">
+            <input
+              type="url"
+              placeholder="Paste a Medium article URL..."
+              value={mediumUrl}
+              onChange={(e) => { setMediumUrl(e.target.value); setImportError(''); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleMediumImport(); } }}
+              disabled={importing}
+            />
+            <button
+              type="button"
+              className="button"
+              onClick={handleMediumImport}
+              disabled={!mediumUrl.trim() || importing}
+            >
+              {importing ? 'Importing...' : 'Import'}
+            </button>
+          </div>
+          {importError && <p className="error-text">{importError}</p>}
+        </div>
+      )}
+
       {error ? <p className="error-text">{error}</p> : null}
 
       <div className="grid-3">
@@ -305,7 +364,7 @@ function PostForm({ initialData, submitLabel, onSubmit, isSaving, authorName }) 
 
       <div className="field">
         <span>Content</span>
-        <NotionEditor value={form.content} onChange={(html) => updateField('content', html)} />
+        <NotionEditor key={editorKey} value={form.content} onChange={(html) => updateField('content', html)} />
       </div>
 
       <div>
