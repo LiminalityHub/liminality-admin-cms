@@ -3,6 +3,35 @@
   position: relative;
 }
 
+.notion-code-language-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  background: #fafafa;
+}
+
+.notion-code-language-bar label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #666;
+}
+
+.notion-code-language-bar select {
+  min-width: 180px;
+  border: 1px solid #d0d0d0;
+  border-radius: 8px;
+  background: #fff;
+  color: #111;
+  padding: 8px 10px;
+  font: inherit;
+}
+
 /* ── Editor area ──────────────────────────────────────────────────── */
 .notion-editor .ProseMirror {
   min-height: 320px;
@@ -89,15 +118,29 @@
 }
 
 .notion-editor .ProseMirror pre {
+  position: relative;
   background: #1e1e1e;
   color: #d4d4d4;
   border-radius: 8px;
-  padding: 16px;
+  padding: 44px 16px 16px;
   margin: 0.5em 0;
   overflow-x: auto;
   font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, monospace;
   font-size: 13px;
   line-height: 1.5;
+  border: 1px solid #111;
+}
+
+.notion-editor .ProseMirror pre::before {
+  content: attr(data-language-label);
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .notion-editor .ProseMirror pre code {
@@ -105,6 +148,11 @@
   padding: 0;
   color: inherit;
   font-size: inherit;
+}
+
+.notion-editor .ProseMirror pre code.hljs {
+  background: transparent;
+  padding: 0;
 }
 
 .notion-editor .ProseMirror hr {

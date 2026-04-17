@@ -1,10 +1,23 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useEditor, EditorContent, Node as TiptapNode } from '@tiptap/react';
-import { BubbleMenu } from '@tiptap/extension-bubble-menu';
+import { mergeAttributes } from '@tiptap/core';
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Underline from '@tiptap/extension-underline';
 import Image from '@tiptap/extension-image';
+import { createLowlight } from 'lowlight';
+import css from 'highlight.js/lib/languages/css';
+import javascript from 'highlight.js/lib/languages/javascript';
+import json from 'highlight.js/lib/languages/json';
+import plaintext from 'highlight.js/lib/languages/plaintext';
+import python from 'highlight.js/lib/languages/python';
+import shell from 'highlight.js/lib/languages/shell';
+import sql from 'highlight.js/lib/languages/sql';
+import swift from 'highlight.js/lib/languages/swift';
+import typescript from 'highlight.js/lib/languages/typescript';
+import xml from 'highlight.js/lib/languages/xml';
+import 'highlight.js/styles/github-dark.css';
 import './NotionEditor.css';
 import { supabase } from '../supabase';
 import imageCompression from 'browser-image-compression';
@@ -18,6 +31,129 @@ function getImagesFromHtml(html) {
 }
 
 /* ── YouTube URL helper ───────────────────────────────────────────── */
+const CODE_LANGUAGES = [
+  { value: 'plaintext', label: 'Plain text' },
+  { value: 'javascript', label: 'JavaScript' },
+  { value: 'typescript', label: 'TypeScript' },
+  { value: 'tsx', label: 'TSX' },
+  { value: 'jsx', label: 'JSX' },
+  { value: 'html', label: 'HTML' },
+  { value: 'css', label: 'CSS' },
+  { value: 'json', label: 'JSON' },
+  { value: 'bash', label: 'Bash' },
+  { value: 'python', label: 'Python' },
+  { value: 'swift', label: 'Swift' },
+  { value: 'sql', label: 'SQL' },
+];
+
+const CODE_LANGUAGE_LABELS = Object.fromEntries(
+  CODE_LANGUAGES.map(({ value, label }) => [value, label])
+);
+
+const DEFAULT_CODE_LANGUAGE = 'plaintext';
+const lowlight = createLowlight();
+
+lowlight.register({
+  plaintext,
+  javascript,
+  js: javascript,
+  typescript,
+  ts: typescript,
+  tsx: typescript,
+  jsx: javascript,
+  html: xml,
+  xml,
+  css,
+  json,
+  bash: shell,
+  shell,
+  sh: shell,
+  python,
+  py: python,
+  swift,
+  sql,
+});
+
+function normalizeCodeLanguage(value) {
+  const raw = String(value || '').trim().toLowerCase();
+
+  if (!raw) return DEFAULT_CODE_LANGUAGE;
+
+  const aliases = {
+    text: 'plaintext',
+    txt: 'plaintext',
+    plain: 'plaintext',
+    js: 'javascript',
+    jsx: 'jsx',
+    ts: 'typescript',
+    tsx: 'tsx',
+    html: 'html',
+    xml: 'html',
+    sh: 'bash',
+    shell: 'bash',
+    zsh: 'bash',
+    py: 'python',
+  };
+
+  return aliases[raw] || (CODE_LANGUAGE_LABELS[raw] ? raw : DEFAULT_CODE_LANGUAGE);
+}
+
+function getCodeLanguageLabel(value) {
+  return CODE_LANGUAGE_LABELS[normalizeCodeLanguage(value)] || CODE_LANGUAGE_LABELS[DEFAULT_CODE_LANGUAGE];
+}
+
+const LanguageAwareCodeBlock = CodeBlockLowlight.extend({
+  addOptions() {
+    return {
+      ...this.parent?.(),
+      defaultLanguage: DEFAULT_CODE_LANGUAGE,
+      languageClassPrefix: 'language-',
+    };
+  },
+
+  addAttributes() {
+    return {
+      language: {
+        default: DEFAULT_CODE_LANGUAGE,
+        parseHTML: (element) => {
+          const htmlLanguage = element.getAttribute('data-language');
+
+          if (htmlLanguage) {
+            return normalizeCodeLanguage(htmlLanguage);
+          }
+
+          const codeEl = element.querySelector('code');
+          const languageClass = Array.from(codeEl?.classList || []).find((className) =>
+            className.startsWith('language-')
+          );
+
+          return normalizeCodeLanguage(languageClass?.replace(/^language-/, ''));
+        },
+        rendered: false,
+      },
+    };
+  },
+
+  renderHTML({ node, HTMLAttributes }) {
+    const language = normalizeCodeLanguage(node.attrs.language);
+
+    return [
+      'pre',
+      mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
+        'data-language': language,
+        'data-language-label': getCodeLanguageLabel(language),
+      }),
+      [
+        'code',
+        {
+          class: language ? `${this.options.languageClassPrefix}${language}` : null,
+        },
+        0,
+      ],
+    ];
+  },
+});
+
 function extractYouTubeId(url) {
   const match = url.match(
     /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|shorts\/))([a-zA-Z0-9_-]{11})/
@@ -108,7 +244,7 @@ const BLOCK_TYPES = [
   { label: 'Bullet List',    icon: '•',   action: (e) => e.chain().focus().toggleBulletList().run() },
   { label: 'Numbered List',  icon: '1.',  action: (e) => e.chain().focus().toggleOrderedList().run() },
   { label: 'Quote',          icon: '"',   action: (e) => e.chain().focus().toggleBlockquote().run() },
-  { label: 'Code Block',     icon: '</>',  action: (e) => e.chain().focus().toggleCodeBlock().run() },
+  { label: 'Code Block',     icon: '</>',  action: (e) => e.chain().focus().toggleCodeBlock({ language: DEFAULT_CODE_LANGUAGE }).run() },
 ];
 
 function getActiveBlockType(editor) {
@@ -131,7 +267,7 @@ const SLASH_ITEMS = [
   { label: 'Bullet List',    icon: '•',   action: (e) => e.chain().focus().toggleBulletList().run() },
   { label: 'Numbered List',  icon: '1.',  action: (e) => e.chain().focus().toggleOrderedList().run() },
   { label: 'Quote',          icon: '"',   action: (e) => e.chain().focus().toggleBlockquote().run() },
-  { label: 'Code Block',     icon: '</>',  action: (e) => e.chain().focus().toggleCodeBlock().run() },
+  { label: 'Code Block',     icon: '</>',  action: (e) => e.chain().focus().toggleCodeBlock({ language: DEFAULT_CODE_LANGUAGE }).run() },
   { label: 'Divider',        icon: '—',   action: (e) => e.chain().focus().setHorizontalRule().run() },
   { label: 'Image',          icon: '🖼',  action: async (e) => {
     const file = await pickImageFile();
@@ -207,12 +343,16 @@ export default function NotionEditor({ value, onChange }) {
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
+        codeBlock: false,
       }),
       Placeholder.configure({
         placeholder: "Type '/' for commands…",
       }),
       Underline,
       Image.configure({ inline: false }),
+      LanguageAwareCodeBlock.configure({
+        lowlight,
+      }),
       YouTube,
     ],
     content: value || '',
@@ -247,6 +387,10 @@ export default function NotionEditor({ value, onChange }) {
       console.log('Editor schema nodes:', Object.keys(ed.state.schema.nodes));
     },
   });
+
+  const activeCodeLanguage = editor?.isActive('codeBlock')
+    ? normalizeCodeLanguage(editor.getAttributes('codeBlock').language)
+    : DEFAULT_CODE_LANGUAGE;
 
   // Compute filtered items for keyboard nav
   const filteredItems = SLASH_ITEMS.filter((item) =>
@@ -528,6 +672,27 @@ export default function NotionEditor({ value, onChange }) {
 
   return (
     <div className="notion-editor-wrap">
+      {editor.isActive('codeBlock') ? (
+        <div className="notion-code-language-bar">
+          <label htmlFor="code-language-select">Code language</label>
+          <select
+            id="code-language-select"
+            value={activeCodeLanguage}
+            onChange={(event) => {
+              editor.chain().focus().updateAttributes('codeBlock', {
+                language: normalizeCodeLanguage(event.target.value),
+              }).run();
+            }}
+          >
+            {CODE_LANGUAGES.map((language) => (
+              <option key={language.value} value={language.value}>
+                {language.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
+
       {/* Floating toolbar on text selection */}
       {toolbarVisible && (
         <div className="notion-bubble-menu" style={{ top: toolbarPos.top, left: toolbarPos.left }}>
