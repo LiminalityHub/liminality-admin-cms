@@ -1,9 +1,11 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 function AdminLayout({ title, children }) {
   const { logout, currentUser, profileName } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isOnPosts = location.pathname === '/posts';
 
   async function handleLogout() {
     await logout();
@@ -14,7 +16,11 @@ function AdminLayout({ title, children }) {
     <div className="app-shell">
       <header className="topbar">
         <div className="topbar-inner">
-          <Link to="/posts" className="brand">Liminality Admin</Link>
+          {isOnPosts ? (
+            <span className="brand brand-static">Liminality Admin</span>
+          ) : (
+            <Link to="/posts" className="brand">Liminality Admin</Link>
+          )}
           <div className="topbar-actions">
             {currentUser && (
               <>
