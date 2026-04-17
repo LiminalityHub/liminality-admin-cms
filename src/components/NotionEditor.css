@@ -95,7 +95,9 @@
   border-radius: 8px;
   padding: 44px 16px 16px;
   margin: 0.5em 0;
-  overflow-x: auto;
+  overflow-x: visible;
+  white-space: pre-wrap;
+  word-break: break-word;
   font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, monospace;
   font-size: 13px;
   line-height: 1.5;
@@ -119,11 +121,16 @@
   padding: 0;
   color: inherit;
   font-size: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .notion-editor .ProseMirror pre code.hljs {
   background: transparent;
   padding: 0;
+  overflow-x: visible;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .notion-editor .ProseMirror .notion-code-block-node {
