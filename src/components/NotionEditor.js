@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useEditor, EditorContent, Node as TiptapNode } from '@tiptap/react';
+import {
+  useEditor,
+  EditorContent,
+  Node as TiptapNode,
+  NodeViewWrapper,
+  NodeViewContent,
+  ReactNodeViewRenderer,
+} from '@tiptap/react';
 import { mergeAttributes } from '@tiptap/core';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import StarterKit from '@tiptap/starter-kit';
@@ -102,6 +109,40 @@ function getCodeLanguageLabel(value) {
   return CODE_LANGUAGE_LABELS[normalizeCodeLanguage(value)] || CODE_LANGUAGE_LABELS[DEFAULT_CODE_LANGUAGE];
 }
 
+function CodeBlockNodeView({ node, updateAttributes }) {
+  const language = normalizeCodeLanguage(node.attrs.language);
+
+  return (
+    <NodeViewWrapper
+      as="div"
+      className="notion-code-block-node"
+      data-language={language}
+      data-language-label={getCodeLanguageLabel(language)}
+    >
+      <div className="notion-code-block-controls" contentEditable={false}>
+        <span>Code language</span>
+        <select
+          aria-label="Code language"
+          value={language}
+          onChange={(event) => {
+            updateAttributes({ language: normalizeCodeLanguage(event.target.value) });
+          }}
+        >
+          {CODE_LANGUAGES.map((item) => (
+            <option key={item.value} value={item.value}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <pre>
+        <NodeViewContent as="code" className={`language-${language}`} />
+      </pre>
+    </NodeViewWrapper>
+  );
+}
+
 const LanguageAwareCodeBlock = CodeBlockLowlight.extend({
   addOptions() {
     return {
@@ -151,6 +192,10 @@ const LanguageAwareCodeBlock = CodeBlockLowlight.extend({
         0,
       ],
     ];
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(CodeBlockNodeView);
   },
 });
 
@@ -387,10 +432,6 @@ export default function NotionEditor({ value, onChange }) {
       console.log('Editor schema nodes:', Object.keys(ed.state.schema.nodes));
     },
   });
-
-  const activeCodeLanguage = editor?.isActive('codeBlock')
-    ? normalizeCodeLanguage(editor.getAttributes('codeBlock').language)
-    : DEFAULT_CODE_LANGUAGE;
 
   // Compute filtered items for keyboard nav
   const filteredItems = SLASH_ITEMS.filter((item) =>
@@ -672,27 +713,6 @@ export default function NotionEditor({ value, onChange }) {
 
   return (
     <div className="notion-editor-wrap">
-      {editor.isActive('codeBlock') ? (
-        <div className="notion-code-language-bar">
-          <label htmlFor="code-language-select">Code language</label>
-          <select
-            id="code-language-select"
-            value={activeCodeLanguage}
-            onChange={(event) => {
-              editor.chain().focus().updateAttributes('codeBlock', {
-                language: normalizeCodeLanguage(event.target.value),
-              }).run();
-            }}
-          >
-            {CODE_LANGUAGES.map((language) => (
-              <option key={language.value} value={language.value}>
-                {language.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      ) : null}
-
       {/* Floating toolbar on text selection */}
       {toolbarVisible && (
         <div className="notion-bubble-menu" style={{ top: toolbarPos.top, left: toolbarPos.left }}>
