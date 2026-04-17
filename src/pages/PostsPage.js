@@ -26,9 +26,15 @@ function PostsPage() {
     loadPosts();
   }, []);
 
-  const handleDelete = async (id) => {
-    const confirmed = window.confirm('Delete this post?');
-    if (!confirmed) return;
+  const handleDelete = async (id, title) => {
+    const answer = window.prompt(
+      `To delete this post, type its title exactly:\n\n"${title}"`
+    );
+    if (answer === null) return;
+    if (answer.trim() !== title.trim()) {
+      window.alert('Title does not match. Deletion cancelled.');
+      return;
+    }
 
     try {
       await deletePost(id);
@@ -71,7 +77,7 @@ function PostsPage() {
                   <td>{post.status || 'published'}</td>
                   <td className="actions-cell">
                     <Link to={`/posts/${post.id}/edit`} className="button button-outline">Edit</Link>
-                    <button type="button" className="button button-danger" onClick={() => handleDelete(post.id)}>Delete</button>
+                    <button type="button" className="button button-danger" onClick={() => handleDelete(post.id, post.title)}>Delete</button>
                   </td>
                 </tr>
               ))}
